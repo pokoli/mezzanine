@@ -1,30 +1,20 @@
 
 from django.contrib import admin
 from django.db.models import AutoField
-from django.http import HttpResponseRedirect
+from django.forms import ValidationError
+from django.shortcuts import redirect
 from django.utils.translation import ugettext_lazy as _
 
 from mezzanine.conf import settings
 from mezzanine.core.forms import DynamicInlineAdminForm
-from mezzanine.core.models import Orderable
-from mezzanine.utils.urls import content_media_urls, admin_url
-
-
-# For >= Django 1.2 include a backport of collapse.js which targets
-# earlier versions of the admin.
-from django import VERSION
-displayable_js = []
-if VERSION >= (1, 2, 0):
-    displayable_js = content_media_urls("js/collapse_backport.js")
+from mezzanine.core.models import CONTENT_STATUS_PUBLISHED, Orderable
+from mezzanine.utils.urls import admin_url
 
 
 class DisplayableAdmin(admin.ModelAdmin):
     """
     Admin class for subclasses of the abstract ``Displayable`` model.
     """
-
-    class Media:
-        js = displayable_js
 
     list_display = ("title", "status", "admin_link")
     list_display_links = ("title",)
@@ -34,11 +24,35 @@ class DisplayableAdmin(admin.ModelAdmin):
     date_hierarchy = "publish_date"
     radio_fields = {"status": admin.HORIZONTAL}
     fieldsets = (
-        (None, {"fields": ["title", "status",
-            ("publish_date", "expiry_date"), ]}),
-        (_("Meta data"), {"fields": ("slug", "description", "keywords"),
-            "classes": ("collapse-closed",)},),
+        (None, {
+            "fields": ["title", "status", ("publish_date", "expiry_date")],
+        }),
+        (_("Meta data"), {
+            "fields": ["slug", ("description", "gen_description"), "keywords"],
+            "classes": ("collapse-closed",)
+        }),
     )
+
+    def get_form(self, request, obj=None, **kwargs):
+        """
+        Add validation for the content field - it's required if status
+        is set to published. We patch this method onto the form to avoid
+        problems that come up with trying to use a form class. See:
+        https://bitbucket.org/stephenmcd/mezzanine/pull-request/23/
+        allow-content-field-on-richtextpage-to-be
+        """
+        form = super(DisplayableAdmin, self).get_form(request, obj, **kwargs)
+
+        def clean_content(form):
+            status = form.cleaned_data.get("status")
+            content = form.cleaned_data.get("content")
+            if status == CONTENT_STATUS_PUBLISHED and not content:
+                raise ValidationError(_("This field is required if status "
+                                        "is set to published."))
+            return content
+
+        form.clean_content = clean_content
+        return form
 
 
 class BaseDynamicInlineAdmin(object):
@@ -133,7 +147,7 @@ class SingletonAdmin(admin.ModelAdmin):
             return super(SingletonAdmin, self).add_view(*args, **kwargs)
         else:
             change_url = admin_url(self.model, "change", singleton.id)
-            return HttpResponseRedirect(change_url)
+            return redirect(change_url)
 
     def changelist_view(self, *args, **kwargs):
         """
@@ -146,16 +160,16 @@ class SingletonAdmin(admin.ModelAdmin):
             return super(SingletonAdmin, self).changelist_view(*args, **kwargs)
         except self.model.DoesNotExist:
             add_url = admin_url(self.model, "add")
-            return HttpResponseRedirect(add_url)
+            return redirect(add_url)
         else:
             change_url = admin_url(self.model, "change", singleton.id)
-            return HttpResponseRedirect(change_url)
+            return redirect(change_url)
 
     def change_view(self, request, object_id, extra_context=None):
         """
         If only the singleton instance exists, pass ``True`` for
         ``singleton`` into the template which will use CSS to hide
-        relevant buttons.
+        the "save and add another" button.
         """
         if extra_context is None:
             extra_context = {}
@@ -165,5 +179,8 @@ class SingletonAdmin(admin.ModelAdmin):
             pass
         else:
             extra_context["singleton"] = True
-        return super(SingletonAdmin, self).change_view(request, object_id,
-                                                       extra_context)
+        response = super(SingletonAdmin, self).change_view(request, object_id,
+                                                           extra_context)
+        if request.POST.get("_save"):
+            response = redirect("admin:index")
+        return response

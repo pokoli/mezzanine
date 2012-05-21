@@ -7,7 +7,7 @@ from django.core.urlresolvers import NoReverseMatch
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 
-from mezzanine.pages.models import Page, RichTextPage
+from mezzanine.pages.models import Page, RichTextPage, Link
 from mezzanine.core.admin import DisplayableAdmin
 from mezzanine.utils.urls import admin_url
 
@@ -25,6 +25,27 @@ class PageAdmin(DisplayableAdmin):
     """
 
     fieldsets = page_fieldsets
+
+    def __init__(self, *args, **kwargs):
+        """
+        For ``Page`` subclasses that are registered with an Admin class
+        that doesn't implement fieldsets, add any extra model fields
+        to this instance's fieldsets. This mimics Django's behaviour of
+        adding all model fields when no fieldsets are defined on the
+        Admin class.
+        """
+        super(PageAdmin, self).__init__(*args, **kwargs)
+        # Test that the fieldsets don't differ from PageAdmin's.
+        if self.model is not Page and self.fieldsets == PageAdmin.fieldsets:
+            # Make a copy so that we aren't modifying other Admin
+            # classes' fieldsets.
+            self.fieldsets = deepcopy(self.fieldsets)
+            # Insert each field between the publishing fields and nav
+            # fields. Do so in reverse order to retain the order of
+            # the model's fields.
+            for field in reversed(self.model._meta.fields):
+                if field not in Page._meta.fields and field.name != "page_ptr":
+                    self.fieldsets[0][1]["fields"].insert(3, field.name)
 
     def in_menu(self):
         """
@@ -71,7 +92,7 @@ class PageAdmin(DisplayableAdmin):
         extra_context["hide_delete_link"] = not page.can_delete(request)
         extra_context["hide_slug_field"] = page.overridden()
         return super(PageAdmin, self).change_view(request, object_id,
-                                                  extra_context)
+                                                  extra_context=extra_context)
 
     def delete_view(self, request, object_id, extra_context=None):
         """
@@ -134,16 +155,25 @@ class PageAdmin(DisplayableAdmin):
         return self._maintain_parent(request, response)
 
 
-richtext_fieldsets = deepcopy(PageAdmin.fieldsets)
-richtext_fieldsets[0][1]["fields"].insert(3, "content")
+# Drop the meta data fields, and move slug towards the stop.
+link_fieldsets = deepcopy(page_fieldsets[:1])
+link_fieldsets[0][1]["fields"] = link_fieldsets[0][1]["fields"][:-1]
+link_fieldsets[0][1]["fields"].insert(1, "slug")
 
 
-class RichTextPageAdmin(PageAdmin):
-    """
-    Admin class for the ``RichText`` default content type.
-    """
-    fieldsets = richtext_fieldsets
+class LinkAdmin(PageAdmin):
+
+    fieldsets = link_fieldsets
+
+    def formfield_for_dbfield(self, db_field, **kwargs):
+        """
+        Make slug mandatory.
+        """
+        if db_field.name == "slug":
+            kwargs["required"] = True
+        return super(LinkAdmin, self).formfield_for_dbfield(db_field, **kwargs)
 
 
 admin.site.register(Page, PageAdmin)
-admin.site.register(RichTextPage, RichTextPageAdmin)
+admin.site.register(RichTextPage, PageAdmin)
+admin.site.register(Link, LinkAdmin)

@@ -1,28 +1,57 @@
 
+from __future__ import with_statement
+from hashlib import md5
 import os
-from urllib import urlopen, urlencode
+from urllib import urlopen, urlencode, unquote
 
 from django.contrib import admin
 from django.contrib.auth import REDIRECT_FIELD_NAME
+from django.contrib.sites.models import Site
+from django.core.files import File
+from django.core.files.storage import default_storage
 from django.core.urlresolvers import reverse, NoReverseMatch
 from django.db.models import Model
-from django.template import Context, Template
+from django.template import (Context, Node, Template, TemplateSyntaxError,
+                             TOKEN_BLOCK)
+from django.template.loader import get_template
 from django.utils.html import strip_tags
 from django.utils.simplejson import loads
 from django.utils.text import capfirst
+
+from PIL import Image, ImageOps
 
 from mezzanine.conf import settings
 from mezzanine.core.fields import RichTextField
 from mezzanine.core.forms import get_edit_form
 from mezzanine.utils.html import decode_entities
 from mezzanine.utils.importing import import_dotted_path
-from mezzanine.utils.views import is_editable
+from mezzanine.utils.sites import current_site_id
 from mezzanine.utils.urls import admin_url
+from mezzanine.utils.views import is_editable
 from mezzanine import template
-from mezzanine.template.loader import get_template
 
 
 register = template.Library()
+
+
+if "compressor" in settings.INSTALLED_APPS:
+    @register.tag
+    def compress(parser, token):
+        from compressor.templatetags.compress import compress
+        return compress(parser, token)
+else:
+    @register.to_end_tag
+    def compress(parsed, context, token):
+        return parsed
+
+
+@register.inclusion_tag("includes/form_fields.html", takes_context=True)
+def fields_for(context, form):
+    """
+    Renders fields for a form.
+    """
+    context["form_for_fields"] = form
+    return context
 
 
 @register.filter
@@ -31,7 +60,48 @@ def is_installed(app_name):
     Returns ``True`` if the given app name is in the
     ``INSTALLED_APPS`` setting.
     """
+    from warnings import warn
+    warn("The is_installed filter is deprecated. Please use the tag "
+         "{% ifinstalled appname %}{% endifinstalled %}")
     return app_name in settings.INSTALLED_APPS
+
+
+@register.tag
+def ifinstalled(parser, token):
+    """
+    Old-style ``if`` tag that renders contents if the given app is
+    installed. The main use case is:
+
+    {% ifinstalled app_name %}
+    {% include "app_name/template.html" %}
+    {% endifinstalled %}
+
+    so we need to manually pull out all tokens if the app isn't
+    installed, since if we used a normal ``if`` tag with a False arg,
+    the include tag will still try and find the template to include.
+    """
+    try:
+        tag, app = token.split_contents()
+    except ValueError:
+        raise TemplateSyntaxError("ifinstalled should be in the form: "
+                                  "{% ifinstalled app_name %}"
+                                  "{% endifinstalled %}")
+
+    end_tag = "end" + tag
+    if app.strip("\"'") not in settings.INSTALLED_APPS:
+        while True:
+            token = parser.tokens.pop(0)
+            if token.token_type == TOKEN_BLOCK and token.contents == end_tag:
+                parser.tokens.insert(0, token)
+                break
+    nodelist = parser.parse((end_tag,))
+    parser.delete_first_token()
+
+    class IfInstalledNode(Node):
+        def render(self, context):
+            return nodelist.render(context)
+
+    return IfInstalledNode()
 
 
 @register.render_tag
@@ -58,6 +128,15 @@ def set_short_url_for(context, token):
     return ""
 
 
+@register.simple_tag
+def gravatar_url(email, size=32):
+    """
+    Return the full URL for a Gravatar given an email hash.
+    """
+    email_hash = md5(email).hexdigest()
+    return "http://www.gravatar.com/avatar/%s?s=%s" % (email_hash, size)
+
+
 @register.to_end_tag
 def metablock(parsed):
     """
@@ -81,58 +160,71 @@ def pagination_for(context, current_page):
 
 
 @register.simple_tag
-def thumbnail(image_url, width, height):
+def thumbnail(image_url, width, height, quality=95):
     """
     Given the URL to an image, resizes the image using the given width and
     height on the first time it is requested, and returns the URL to the new
     resized image. if width or height are zero then original ratio is
     maintained.
     """
-
-    image_url = unicode(image_url)
-    if image_url.startswith(settings.MEDIA_URL):
-        image_url = image_url.replace(settings.MEDIA_URL, '', 1)
-    image_path = os.path.join(settings.MEDIA_ROOT, image_url)
-    image_dir, image_name = os.path.split(image_path)
-    extension = os.path.splitext(image_name)[1]
-    filetype = {".png": "PNG", ".gif": "GIF"}.get(extension, "JPEG")
-    thumb_name = "%s-%sx%s%s" % (os.path.splitext(image_name)[0], width,
-                                    height, extension)
-    thumb_path = os.path.join(image_dir, thumb_name)
-    thumb_url = "%s/%s" % (os.path.dirname(image_url), thumb_name)
-    # abort if thumbnail exists, original image doesn't exist, invalid width or
-    # height are given, or PIL not installed
     if not image_url:
         return ""
+
+    image_url = unquote(unicode(image_url))
+    if image_url.startswith(settings.MEDIA_URL):
+        image_url = image_url.replace(settings.MEDIA_URL, "", 1)
+    image_dir, image_name = os.path.split(image_url)
+    image_prefix, image_ext = os.path.splitext(image_name)
+    filetype = {".png": "PNG", ".gif": "GIF"}.get(image_ext, "JPEG")
+    thumb_name = "%s-%sx%s%s" % (image_prefix, width, height, image_ext)
+    thumb_dir = os.path.join(settings.MEDIA_ROOT, image_dir,
+                             settings.THUMBNAILS_DIR_NAME)
+    if not os.path.exists(thumb_dir):
+        os.makedirs(thumb_dir)
+    thumb_path = os.path.join(thumb_dir, thumb_name)
+    thumb_url = "%s/%s" % (settings.THUMBNAILS_DIR_NAME, thumb_name)
+    image_url_path = os.path.dirname(image_url)
+    if image_url_path:
+        thumb_url = "%s/%s" % (image_url_path, thumb_url)
+
     try:
-        width = int(width)
-        height = int(height)
-    except ValueError:
-        return image_url
-    if not os.path.exists(image_path) or (width == 0 and height == 0):
-        return image_url
-    try:
-        from PIL import Image, ImageOps
-    except ImportError:
+        thumb_exists = os.path.exists(thumb_path)
+    except UnicodeEncodeError:
+        # The image that was saved to a filesystem with utf-8 support,
+        # but somehow the locale has changed and the filesystem does not
+        # support utf-8.
+        from mezzanine.core.exceptions import FileSystemEncodingChanged
+        raise FileSystemEncodingChanged()
+    if thumb_exists:
+        # Thumbnail exists, don't generate it.
+        return thumb_url
+    elif not default_storage.exists(image_url):
+        # Requested image does not exist, just return its URL.
         return image_url
 
-    # open image, determine ratio if required and resize/crop/save
-    image = Image.open(image_path)
+    image = Image.open(default_storage.open(image_url))
+    image_info = image.info
+    width = int(width)
+    height = int(height)
 
     # If already right size, don't do anything.
     if width == image.size[0] and height == image.size[1]:
         return image_url
-    if os.path.exists(thumb_path):
-        return thumb_url
+    # Set dimensions.
     if width == 0:
         width = image.size[0] * height / image.size[1]
     elif height == 0:
         height = image.size[1] * width / image.size[0]
-    if image.mode not in ("L", "RGB"):
-        image = image.convert("RGB")
+    if image.mode not in ("L", "RGBA"):
+        image = image.convert("RGBA")
     try:
-        image = ImageOps.fit(image, (width, height), Image.ANTIALIAS).save(
-            thumb_path, filetype, quality=100)
+        image = ImageOps.fit(image, (width, height), Image.ANTIALIAS)
+        image = image.save(thumb_path, filetype, quality=quality, **image_info)
+        # Push a remote copy of the thumbnail if MEDIA_URL is
+        # absolute.
+        if "://" in settings.MEDIA_URL:
+            with open(thumb_path, "r") as f:
+                default_storage.save(thumb_url, File(f))
     except:
         return image_url
     return thumb_url
@@ -143,7 +235,7 @@ def editable_loader(context):
     """
     Set up the required JS/CSS for the in-line editing toolbar and controls.
     """
-    t = get_template("includes/editable_toolbar.html", context)
+    t = get_template("includes/editable_toolbar.html")
     context["REDIRECT_FIELD_NAME"] = REDIRECT_FIELD_NAME
     context["toolbar"] = t.render(Context(context))
     context["richtext_media"] = RichTextField().formfield().widget.media
@@ -156,12 +248,10 @@ def richtext_filter(content):
     This template filter takes a string value and passes it through the
     function specified by the RICHTEXT_FILTER setting.
     """
-
     if settings.RICHTEXT_FILTER:
         func = import_dotted_path(settings.RICHTEXT_FILTER)
     else:
         func = lambda s: s
-
     return func(content)
 
 
@@ -195,7 +285,7 @@ def editable(parsed, context, token):
             field_names = ",".join([f[1] for f in fields])
             context["form"] = get_edit_form(obj, field_names)
             context["original"] = parsed
-            t = get_template("includes/editable_form.html", context)
+            t = get_template("includes/editable_form.html")
             return t.render(Context(context))
     return parsed
 
@@ -207,6 +297,8 @@ def try_url(url_name):
     names in admin templates as these won't resolve when admin tests are
     running.
     """
+    from warnings import warn
+    warn("try_url is deprecated, use the url tag with the 'as' arg instead.")
     try:
         url = reverse(url_name)
     except NoReverseMatch:
@@ -274,20 +366,23 @@ def admin_app_list(request):
         name = unicode(name)
         for unfound_item in set(items) - found_items:
             if isinstance(unfound_item, (list, tuple)):
-                item_name, item_url = unfound_item[0], try_url(unfound_item[1])
-                if item_url:
-                    if name not in app_dict:
-                        app_dict[name] = {
-                            "index": i,
-                            "name": name,
-                            "models": [],
-                        }
-                    app_dict[name]["models"].append({
-                        "index": items.index(unfound_item),
-                        "perms": {"custom": True},
-                        "name": item_name,
-                        "admin_url": item_url,
-                    })
+                item_name, item_url = unfound_item[0], unfound_item[1]
+                try:
+                    item_url = reverse(item_url)
+                except NoReverseMatch:
+                    continue
+                if name not in app_dict:
+                    app_dict[name] = {
+                        "index": i,
+                        "name": name,
+                        "models": [],
+                    }
+                app_dict[name]["models"].append({
+                    "index": items.index(unfound_item),
+                    "perms": {"custom": True},
+                    "name": item_name,
+                    "admin_url": item_url,
+                })
 
     app_list = app_dict.values()
     sort = lambda x: x["name"] if x["index"] is None else x["index"]
@@ -304,6 +399,8 @@ def admin_dropdown_menu(context):
     Renders the app list for the admin dropdown menu navigation.
     """
     context["dropdown_menu_app_list"] = admin_app_list(context["request"])
+    context["dropdown_menu_sites"] = list(Site.objects.all())
+    context["dropdown_menu_selected_site_id"] = current_site_id()
     return context
 
 

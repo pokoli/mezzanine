@@ -4,8 +4,8 @@ consistent access method for settings defined in applications, the project
 or Django itself. Settings can also be made editable via the admin.
 """
 
-from django.contrib.sites.models import Site
 from django.conf import settings as django_settings
+from django.template.defaultfilters import urlize
 
 from mezzanine import __version__
 
@@ -14,7 +14,7 @@ registry = {}
 
 
 def register_setting(name="", label="", editable=False, description="",
-        default=None, append=False):
+                     default=None, choices=None, append=False):
     """
     Registers a setting that can be edited via the admin.
     """
@@ -24,12 +24,14 @@ def register_setting(name="", label="", editable=False, description="",
     else:
         default = getattr(django_settings, name, default)
         setting_type = type(default)
+        if not label:
+            label = name.replace("_", " ").title()
         if setting_type is str:
             setting_type = unicode
         registry[name] = {"name": name, "label": label,
-                          "description": description,
+                          "description": urlize(description),
                           "editable": editable, "default": default,
-                          "type": setting_type}
+                          "choices": choices, "type": setting_type}
 
 
 class Settings(object):
@@ -45,7 +47,7 @@ class Settings(object):
 
     def __init__(self):
         """
-        Marking loaded as True to begin with prevents some nasty
+        Marking loaded as ``True`` to begin with prevents some nasty
         errors when the DB table is first created.
         """
         self._loaded = True
@@ -70,29 +72,34 @@ class Settings(object):
             return getattr(django_settings, name)
 
         # First access for an editable setting - load from DB into cache.
+        # Also remove settings from the DB that are no longer registered.
         if setting["editable"] and not self._loaded:
             from mezzanine.conf.models import Setting
-            settings = Setting.objects.filter(site=Site.objects.get_current())
+            settings = Setting.objects.all()
+            removed = []
             for setting_obj in settings:
-                setting_type = registry[setting_obj.name]["type"]
-                if setting_type is bool:
-                    setting_value = setting_obj.value != "False"
+                try:
+                    setting_type = registry[setting_obj.name]["type"]
+                except KeyError:
+                    removed.append(setting_obj.id)
                 else:
-                    setting_value = setting_type(setting_obj.value)
-                self._editable_cache[setting_obj.name] = setting_value
+                    if setting_type is bool:
+                        setting_value = setting_obj.value != "False"
+                    else:
+                        setting_value = setting_type(setting_obj.value)
+                    self._editable_cache[setting_obj.name] = setting_value
+            if removed:
+                Setting.objects.filter(id__in=removed).delete()
             self._loaded = True
 
         # Use cached editable setting if found, otherwise use default.
         try:
-            setting_value = self._editable_cache[name]
+            return self._editable_cache[name]
         except KeyError:
-            pass
-        else:
-            return setting_value
-        return setting["default"]
+            return setting["default"]
 
 
-other_apps = [a for a in django_settings.INSTALLED_APPS if a != __name__]
+other_apps = [app for app in django_settings.INSTALLED_APPS if app != __name__]
 for app in [__name__] + other_apps:
     try:
         __import__("%s.defaults" % app)

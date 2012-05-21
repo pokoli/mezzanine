@@ -8,12 +8,26 @@ from django.utils.translation import ugettext_lazy as _
 
 from mezzanine.conf import settings
 from mezzanine.core.models import Orderable
-from mezzanine.utils.urls import content_media_urls
 
 
-tinymce_main = [settings.ADMIN_MEDIA_PREFIX +
-                "tinymce/jscripts/tiny_mce/tiny_mce.js"]
-tinymce_setup = content_media_urls("js/tinymce_setup.js")
+class Html5Mixin(object):
+    """
+    Mixin for form classes. Adds HTML5 features to forms for client
+    side validation by the browser, like a "required" attribute and
+    "email" and "url" input types.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(Html5Mixin, self).__init__(*args, **kwargs)
+        if hasattr(self, "fields"):
+            for name, field in self.fields.items():
+                if settings.FORMS_USE_HTML5:
+                    if isinstance(field, forms.EmailField):
+                        self.fields[name].widget.input_type = "email"
+                    elif  isinstance(field, forms.URLField):
+                        self.fields[name].widget.input_type = "url"
+                if field.required:
+                    self.fields[name].widget.attrs["required"] = ""
 
 
 class TinyMceWidget(forms.Textarea):
@@ -23,7 +37,9 @@ class TinyMceWidget(forms.Textarea):
     """
 
     class Media:
-        js = tinymce_main + tinymce_setup
+        js = (settings.ADMIN_MEDIA_PREFIX +
+              "tinymce/jscripts/tiny_mce/tiny_mce.js",
+              settings.TINYMCE_SETUP_JS,)
 
     def __init__(self, *args, **kwargs):
         super(TinyMceWidget, self).__init__(*args, **kwargs)
@@ -50,8 +66,8 @@ class DynamicInlineAdminForm(forms.ModelForm):
     """
 
     class Media:
-        js = content_media_urls("js/jquery-ui-1.8.14.custom.min.js",
-                                "js/dynamic_inline.js",)
+        js = ("mezzanine/js/jquery-ui-1.8.14.custom.min.js",
+              "mezzanine/js/admin/dynamic_inline.js",)
 
     def __init__(self, *args, **kwargs):
         super(DynamicInlineAdminForm, self).__init__(*args, **kwargs)
@@ -66,7 +82,6 @@ class SplitSelectDateTimeWidget(forms.SplitDateTimeWidget):
     """
     def __init__(self, attrs=None, date_format=None, time_format=None):
         date_widget = SelectDateWidget(attrs=attrs)
-        time_format = forms.SplitDateTimeWidget.time_format
         time_widget = forms.TimeInput(attrs=attrs, format=time_format)
         forms.MultiWidget.__init__(self, (date_widget, time_widget), attrs)
 

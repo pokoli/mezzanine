@@ -2,10 +2,12 @@
 import re
 import unicodedata
 
-from django.core.urlresolvers import reverse
+from django.core.urlresolvers import reverse, NoReverseMatch
+from django.shortcuts import redirect
 from django.utils.encoding import smart_unicode
 
 from mezzanine.conf import settings
+from mezzanine.utils.importing import import_dotted_path
 
 
 def admin_url(model, url, object_id=None):
@@ -20,16 +22,15 @@ def admin_url(model, url, object_id=None):
     return reverse(url, args=args)
 
 
-def content_media_urls(*paths):
-    """
-    Prefix the list of paths with the ``CONTENT_MEDIA_URL`` setting for
-    internally hosted JS and CSS files.
-    """
-    media_url = settings.CONTENT_MEDIA_URL.strip("/")
-    return ["/%s/%s" % (media_url, path) for path in paths]
-
-
 def slugify(s):
+    """
+    Loads the callable defined by the ``SLUGIFY`` setting, which defaults
+    to the ``slugify_unicode`` function.
+    """
+    return import_dotted_path(settings.SLUGIFY)(s)
+
+
+def slugify_unicode(s):
     """
     Replacement for Django's slugify which allows unicode chars in
     slugs, for URLs in Chinese, Russian, etc.
@@ -45,12 +46,17 @@ def slugify(s):
     return re.sub("[-\s]+", "-", "".join(chars).strip()).lower()
 
 
-def static_urls(url_prefix, document_root):
+def login_redirect(request):
     """
-    Returns the ``urlpattern`` for serving static content from the given
-    ``document_root`` over the given ``url_prefix``.
+    Returns the redirect response for login/signup. Favors:
+    - next param
+    - LOGIN_REDIRECT_URL setting
+    - homepage
     """
-    pattern = "^%s/(?P<path>.*)$" % url_prefix.strip("/")
-    view = "django.views.static.serve"
-    args = {"document_root": document_root}
-    return (pattern, view, args)
+    next = request.GET.get("next")
+    if not next:
+        try:
+            next = reverse(settings.LOGIN_REDIRECT_URL)
+        except NoReverseMatch:
+            next = "/"
+    return redirect(next)

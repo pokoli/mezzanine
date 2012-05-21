@@ -31,9 +31,13 @@ class Page(Orderable, Displayable):
     def __unicode__(self):
         return self.titles
 
-    @models.permalink
     def get_absolute_url(self):
-        return ("page", (), {"slug": self.slug})
+        if self.content_model == "link":
+            return self.slug
+        if self.slug == "/":
+            return reverse("home")
+        else:
+            return reverse("page", kwargs={"slug": self.slug})
 
     def get_admin_url(self):
         return admin_url(self, "change", self.id)
@@ -94,7 +98,7 @@ class Page(Orderable, Displayable):
         """
         Dynamic ``add`` permission for content types to override.
         """
-        return True
+        return not self.overridden()
 
     def can_change(self, request):
         """
@@ -114,7 +118,8 @@ class Page(Orderable, Displayable):
         of properties based on the current URL that are used within the
         various types of menus.
         """
-        slug = slug.strip("/")
+        from mezzanine.urls import PAGES_SLUG
+        slug = slug.strip("/").replace(PAGES_SLUG, "", 1)
         parent_slug = lambda slug: "/".join(slug.split("/")[:-1]) + "/"
         self.is_current_sibling = parent_slug(slug) == parent_slug(self.slug)
         self.is_current_or_ascendant = (slug + "/").startswith(self.slug + "/")
@@ -134,3 +139,14 @@ class RichTextPage(Page, RichText):
     class Meta:
         verbose_name = _("Rich text page")
         verbose_name_plural = _("Rich text pages")
+
+
+class Link(Page):
+    """
+    A general content type for creating external links in the page
+    menu.
+    """
+
+    class Meta:
+        verbose_name = _("Link")
+        verbose_name_plural = _("Links")

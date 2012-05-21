@@ -1,34 +1,56 @@
-from datetime import datetime
 
 from django.contrib.contenttypes.generic import GenericForeignKey
-from django.contrib.sites.models import Site
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.db.models.base import ModelBase
 from django.template.defaultfilters import truncatewords_html
 from django.utils.html import strip_tags
 from django.utils.translation import ugettext, ugettext_lazy as _
-from django.contrib.sites.managers import CurrentSiteManager
 
 from mezzanine.core.fields import RichTextField
-from mezzanine.core.managers import DisplayableManager
+from mezzanine.core.managers import DisplayableManager, CurrentSiteManager
 from mezzanine.generic.fields import KeywordsField
 from mezzanine.utils.html import TagCloser
 from mezzanine.utils.models import base_concrete_model
+from mezzanine.utils.sites import current_site_id
+from mezzanine.utils.timezone import now
 from mezzanine.utils.urls import slugify
 
 
-class Slugged(models.Model):
+class SiteRelated(models.Model):
+    """
+    Abstract model for all things site-related. Adds a foreignkey to
+    Django's ``Site`` model, and filters by site with all querysets.
+    See ``mezzanine.utils.sites.current_site_id`` for implementation
+    details.
+    """
+
+    objects = CurrentSiteManager()
+
+    class Meta:
+        abstract = True
+
+    site = models.ForeignKey("sites.Site", editable=False)
+
+    def save(self, update_site=False, *args, **kwargs):
+        """
+        Set the site to the current site when the record is first
+        created, or the ``update_site`` argument is explicitly set
+        to ``True``.
+        """
+        if update_site or not self.id:
+            self.site_id = current_site_id()
+        super(SiteRelated, self).save(*args, **kwargs)
+
+
+class Slugged(SiteRelated):
     """
     Abstract model that handles auto-generating slugs. Each slugged
     object is also affiliated with a specific site object.
     """
 
-    title = models.CharField(_("Title"), max_length=100)
-    slug = models.CharField(_("URL"), max_length=100, blank=True, null=True)
-    site = models.ForeignKey(Site, editable=False)
-
-    objects = CurrentSiteManager()
+    title = models.CharField(_("Title"), max_length=500)
+    slug = models.CharField(_("URL"), max_length=2000, blank=True, null=True)
 
     class Meta:
         abstract = True
@@ -37,11 +59,9 @@ class Slugged(models.Model):
     def __unicode__(self):
         return self.title
 
-    def save(self, update_site=False, *args, **kwargs):
+    def save(self, *args, **kwargs):
         """
-        Create a unique slug by appending an index. Set the site to
-        the current site when the record is first created, unless the
-        ``update_site`` argument is explicitly set to ``True``.
+        Create a unique slug by appending an index.
         """
         if not self.slug:
             # For custom content types, use the ``Page`` instance for
@@ -62,15 +82,19 @@ class Slugged(models.Model):
                 except ObjectDoesNotExist:
                     break
                 i += 1
-        if update_site or not self.id:
-            self.site = Site.objects.get_current()
         super(Slugged, self).save(*args, **kwargs)
 
     def get_slug(self):
         """
         Allows subclasses to implement their own slug creation logic.
         """
-        return slugify(self.title)
+        return slugify(self)
+
+    def admin_link(self):
+        return "<a href='%s'>%s</a>" % (self.get_absolute_url(),
+                                        ugettext("View on site"))
+    admin_link.allow_tags = True
+    admin_link.short_description = ""
 
 
 class MetaData(models.Model):
@@ -79,54 +103,22 @@ class MetaData(models.Model):
     """
 
     description = models.TextField(_("Description"), blank=True)
+    gen_description = models.BooleanField(_("Generate description"),
+        help_text=_("If checked, the description will be automatically "
+                    "generated from content. Uncheck if you want to manually "
+                    "set a custom description."), default=True)
     keywords = KeywordsField(verbose_name=_("Keywords"))
-
-    class Meta:
-        abstract = True
-
-
-CONTENT_STATUS_DRAFT = 1
-CONTENT_STATUS_PUBLISHED = 2
-CONTENT_STATUS_CHOICES = (
-    (CONTENT_STATUS_DRAFT, _("Draft")),
-    (CONTENT_STATUS_PUBLISHED, _("Published")),
-)
-
-
-class Displayable(Slugged, MetaData):
-    """
-    Abstract model that provides features of a visible page on the
-    website such as publishing fields. Basis of Mezzanine pages and
-    blog posts.
-    """
-
-    status = models.IntegerField(_("Status"),
-        choices=CONTENT_STATUS_CHOICES, default=CONTENT_STATUS_DRAFT)
-    publish_date = models.DateTimeField(_("Published from"),
-        help_text=_("With published checked, won't be shown until this time"),
-        blank=True, null=True)
-    expiry_date = models.DateTimeField(_("Expires on"),
-        help_text=_("With published checked, won't be shown after this time"),
-        blank=True, null=True)
-    short_url = models.URLField(blank=True, null=True)
-
-    objects = DisplayableManager()
-    search_fields = {"keywords": 10, "title": 5}
 
     class Meta:
         abstract = True
 
     def save(self, *args, **kwargs):
         """
-        Set default for ``publsh_date`` and ``description`` if none
-        given.
+        Set the description field on save.
         """
-        if self.publish_date is None:
-            # publish_date will be blank when a blog post is created
-            # from the quick blog form in the admin dashboard.
-            self.publish_date = datetime.now()
-        self.description = strip_tags(self.description_from_content())
-        super(Displayable, self).save(*args, **kwargs)
+        if self.gen_description:
+            self.description = strip_tags(self.description_from_content())
+        super(MetaData, self).save(*args, **kwargs)
 
     def description_from_content(self):
         """
@@ -145,7 +137,7 @@ class Displayable(Slugged, MetaData):
                             break
         # Fall back to the title if description couldn't be determined.
         if not description:
-            description = self.title
+            description = unicode(self)
         # Strip everything after the first block or sentence.
         ends = ("</p>", "<br />", "<br/>", "<br>", "</ul>",
                 "\n", ". ", "! ", "? ")
@@ -158,11 +150,47 @@ class Displayable(Slugged, MetaData):
             description = truncatewords_html(description, 100)
         return description
 
-    def admin_link(self):
-        return "<a href='%s'>%s</a>" % (self.get_absolute_url(),
-                                        ugettext("View on site"))
-    admin_link.allow_tags = True
-    admin_link.short_description = ""
+
+CONTENT_STATUS_DRAFT = 1
+CONTENT_STATUS_PUBLISHED = 2
+CONTENT_STATUS_CHOICES = (
+    (CONTENT_STATUS_DRAFT, _("Draft")),
+    (CONTENT_STATUS_PUBLISHED, _("Published")),
+)
+
+
+class Displayable(Slugged, MetaData):
+    """
+    Abstract model that provides features of a visible page on the
+    website such as publishing fields. Basis of Mezzanine pages,
+    blog posts, and Cartridge products.
+    """
+
+    status = models.IntegerField(_("Status"),
+        choices=CONTENT_STATUS_CHOICES, default=CONTENT_STATUS_PUBLISHED)
+    publish_date = models.DateTimeField(_("Published from"),
+        help_text=_("With published checked, won't be shown until this time"),
+        blank=True, null=True)
+    expiry_date = models.DateTimeField(_("Expires on"),
+        help_text=_("With published checked, won't be shown after this time"),
+        blank=True, null=True)
+    short_url = models.URLField(blank=True, null=True)
+
+    objects = DisplayableManager()
+    search_fields = {"keywords": 10, "title": 5}
+
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        """
+        Set default for ``publish_date``. We can't use ``auto_add`` on
+        the field as it will be blank when a blog post is created from
+        the quick blog form in the admin dashboard.
+        """
+        if self.publish_date is None:
+            self.publish_date = now()
+        super(Displayable, self).save(*args, **kwargs)
 
 
 class RichText(models.Model):

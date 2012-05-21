@@ -7,10 +7,11 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Mezzanine\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2011-11-26 10:03-0430\n"
-"PO-Revision-Date: 2011-11-12 03:20+0000\n"
-"Last-Translator: sebasmagri <sebasmagri@gmail.com>\n"
-"Language-Team: LANGUAGE <LL@li.org>\n"
+"POT-Creation-Date: 2012-04-25 01:05+0400\n"
+"PO-Revision-Date: 2012-03-11 23:54+0000\n"
+"Last-Translator: Sebastián Ramírez Magrí <sebasmagri@gmail.com>\n"
+"Language-Team: Russian (http://www.transifex.net/projects/p/mezzanine/"
+"language/ru/)\n"
 "Language: ru\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -18,116 +19,144 @@ msgstr ""
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n"
 "%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2)\n"
 
-#: admin.py:36
+#: admin.py:39
 #, python-format
 msgid "Change %s"
 msgstr "Изменить %s"
 
-#: defaults.py:12
+#: defaults.py:30
 msgid "Controls the ordering and grouping of the admin menu."
 msgstr "Порядок и группировка отображения элементов административного меню"
 
-#: defaults.py:15
+#: defaults.py:33
 msgid "Content"
 msgstr "Содержимое"
 
-#: defaults.py:16
+#: defaults.py:34
 msgid "Media Library"
-msgstr "Билбиотека файлов"
+msgstr "Медиа-библиотека"
 
-#: defaults.py:17
+#: defaults.py:35
 msgid "Site"
 msgstr "Сайт"
 
-#: defaults.py:18
+#: defaults.py:36
 msgid "Users"
 msgstr "Пользователи"
 
-#: defaults.py:24
+#: defaults.py:42
 msgid "Unregister these models from the admin."
-msgstr "Убрать эти модели из центра администрирования"
+msgstr "Убрать эти модели из центра администрирования."
 
-#: defaults.py:31
+#: defaults.py:49
 msgid "bit.ly username"
 msgstr "Логин на bit.ly"
 
-#: defaults.py:32
-msgid "Username for bit.ly URL shortening service."
+#: defaults.py:50
+msgid "Username for http://bit.ly URL shortening service."
 msgstr "Имя пользователя на сервисе сокращения URL bit.ly"
 
-#: defaults.py:39
+#: defaults.py:57
 msgid "bit.ly key"
 msgstr "Ключ bit.ly"
 
-#: defaults.py:40
-msgid "Key for bit.ly URL shortening service."
+#: defaults.py:58
+msgid "Key for http://bit.ly URL shortening service."
 msgstr "Ключ на сервисе сокращения URL bit.ly"
 
-#: defaults.py:47
+#: defaults.py:65
+msgid "Enable featured images in blog posts"
+msgstr "Включает изображение для заметок"
+
+#: defaults.py:72
+msgid "Use date URLs"
+msgstr "Использовать адреса с датой"
+
+#: defaults.py:73
+msgid ""
+"If ``True``, URLs for blog post include the month and year. Eg: /blog/yyyy/"
+"mm/slug/"
+msgstr ""
+"Если ``Да``, адреса страниц блога будут содержать год и месяц: /blog/yyyy/mm/"
+"slug/"
+
+#: defaults.py:81
 msgid "Blog posts per page"
-msgstr "Сообщений блога на страницу"
+msgstr "Количество заметок на странице"
 
-#: defaults.py:48
+#: defaults.py:82
 msgid "Number of blog posts shown on a blog listing page."
-msgstr ""
+msgstr "Количество заметок, отображаемых в списке на одной странице"
 
-#: defaults.py:55
-msgid "Max blog paging links"
-msgstr "Максимум ссылок на страницы блога"
-
-#: defaults.py:56
-msgid "Max number of paging links shown on a blog listing page."
-msgstr ""
-
-#: defaults.py:63
+#: defaults.py:89
 msgid "Slug of the page object for the blog."
-msgstr "Внутренний URL галвной страницы блога"
+msgstr "Внутренний URL главной страницы блога"
 
-#: defaults.py:70
+#: defaults.py:96
+msgid "Accounts required for commenting"
+msgstr "Комментарии требуют наличие аккаунта"
+
+#: defaults.py:97
+msgid "If ``True``, users must log in to comment."
+msgstr "Если ``Да``, то пользователи должны быть залогинены, чтобы иметь возможность оставлять комментарии."
+
+#: defaults.py:104
+msgid "Akismet API Key"
+msgstr ""
+
+#: defaults.py:105
+msgid ""
+"Key for http://akismet.com spam filtering service. Used for filtering "
+"comments and forms."
+msgstr ""
+"Ключ для сервиса фильтрации спама http://akismet.com. Для комментариев и "
+"форм."
+
+#: defaults.py:113
 msgid "Disqus shortname"
 msgstr "Логин на сервисе Disqus"
 
-#: defaults.py:71
+#: defaults.py:114
 msgid "Shortname for the http://disqus.com comments service."
 msgstr "Ваш логин на сервисе комментариев http://disqus.com"
 
-#: defaults.py:78
+#: defaults.py:121
 msgid "Disqus public key"
 msgstr "Публичный ключ Discus"
 
-#: defaults.py:79
-msgid "Public key for Disqus developer API"
+#: defaults.py:122
+msgid "Public key for http://disqus.com developer API"
 msgstr "Публичный ключ API Discus"
 
-#: defaults.py:86
+#: defaults.py:129
 msgid "Disqus secret key"
 msgstr "Секретный ключ Discus"
 
-#: defaults.py:87
-msgid "Secret key for Disqus developer API"
+#: defaults.py:130
+msgid "Secret key for http://disqus.com developer API"
 msgstr "Секретный ключ API Discus"
 
-#: defaults.py:94
+#: defaults.py:137
 msgid "Auto-approve comments"
 msgstr "Автоподтверждение комментариев"
 
-#: defaults.py:95
+#: defaults.py:138
 msgid "If ``True``, built-in comments are approved by default."
 msgstr "Если ``Да``, то комментарии утверждаются автоматически"
 
-#: defaults.py:102
+#: defaults.py:145
 msgid "Admin comments"
 msgstr "Комментариев в админке"
 
-#: defaults.py:103
+#: defaults.py:146
 msgid "Number of latest comments shown in the admin dashboard."
-msgstr ""
+msgstr "Количество последних комментариев, отображаемых на панели в админке."
 
-#: defaults.py:110
+#: defaults.py:153
 msgid "Show unapproved comments"
 msgstr "Неподтверждённые комментарии"
 
-#: defaults.py:111
+#: defaults.py:154
 msgid ""
 "If ``True``, comments that have ``is_public`` unchecked will still be "
 "displayed, but replaced with a ``waiting to be approved`` message."
@@ -135,11 +164,11 @@ msgstr ""
 "Если ``Да``, то неопубликованные комментарии будут отображаться, но при этом "
 "будут заменены на надпись ``ожидает подтверждения``"
 
-#: defaults.py:120
+#: defaults.py:163
 msgid "Show removed comments"
 msgstr "Удалённые комментарии"
 
-#: defaults.py:121
+#: defaults.py:164
 msgid ""
 "If ``True``, comments that have ``removed`` checked will still be displayed, "
 "but replaced with a ``removed`` message."
@@ -147,31 +176,23 @@ msgstr ""
 "Если ``Да``, то удалённые комментарии продолжат отображаться, но при этом "
 "будут заменены на надпись ``Удалено``"
 
-#: defaults.py:129
-msgid "Absolute path to Mezzanine's internal media files."
-msgstr "Абсолютный путь до внутренних медиа файлов Mezzanine"
-
-#: defaults.py:136
-msgid "URL prefix for serving Mezzanine's internal media files."
-msgstr "URL префикс до внутренних медиа файлов Mezzanine"
-
-#: defaults.py:156
+#: defaults.py:185
 msgid ""
 "A three item sequence, each containing a sequence of template tags used to "
 "render the admin dashboard."
 msgstr "3 колонки модулей, отображаемых на административной панели"
 
-#: defaults.py:164
+#: defaults.py:193
 msgid "Device specific template sub-directory to use as the default device."
 msgstr "Папка шаблона по умолчанию для мобильных устройств"
 
-#: defaults.py:172
+#: defaults.py:201
 msgid ""
 "Mapping of device specific template sub-directory names to the sequence of "
 "strings that may be found in their user agents."
 msgstr "Соответствие различных моделей мобильных устройств с шаблонами"
 
-#: defaults.py:194
+#: defaults.py:223
 msgid ""
 "A sequence of fields that will be injected into Mezzanine's (or any "
 "library's) models. Each item in the sequence is a four item sequence. The "
@@ -183,68 +204,71 @@ msgid ""
 "Django model fields."
 msgstr ""
 
-#: defaults.py:209
+#: defaults.py:238
+msgid ""
+"If ``True``, emails sent to extra recipients for form submissions won't be "
+"sent from an address taken from one of the form's email fields."
+msgstr ""
+
+#: defaults.py:247
 msgid "Max length allowed for field values in the forms app."
 msgstr "Максимальная длина, допустимая для полей пользовательских форм"
 
-#: defaults.py:216
+#: defaults.py:254
 msgid "Max length allowed for field labels in the forms app."
 msgstr "Максимально допустимая длина названий полей пользовательских форм"
 
-#: defaults.py:223
-msgid ""
-"If ``True``, website forms created by the forms app will use HTML5 features."
+#: defaults.py:261
+msgid "If ``True``, website forms will use HTML5 features."
 msgstr ""
 "Если ``Да``, то пользовательские формы будут использовать преимущества HTML5."
 
-#: defaults.py:231
+#: defaults.py:268
 msgid "Char to use as a field delimiter when exporting form responses as CSV."
 msgstr ""
 "Символ, используемый как разделитель полей, при экспорте ответов на форму в "
 "формате CSV"
 
-#: defaults.py:239
+#: defaults.py:276
 msgid "Absolute path for storing file uploads for the forms app."
 msgstr "Пусть для сохранения файлов, закачанных через пользовательские формы"
 
-#: defaults.py:246
+#: defaults.py:283
 msgid "Google Analytics ID"
 msgstr "Google Analytics ID"
 
-#: defaults.py:248
+#: defaults.py:285
 msgid "Google Analytics ID (http://www.google.com/analytics/)"
 msgstr "Google Analytics ID (http://www.google.com/analytics/)"
 
-#: defaults.py:254
+#: defaults.py:291
 msgid ""
-"Dotted package path and class name of the widget to use for the "
-"``RichTextField``."
+"A sequence mapping host names to themes, allowing different templates to be "
+"served per HTTP hosts Each item in the sequence is a two item sequence, "
+"containing a host such as ``othersite.example.com``, and the name of an "
+"importable Python package for the theme. If the host is matched for a "
+"request, the templates directory inside the theme package will be first "
+"searched when loading templates."
 msgstr ""
-"Разделённый точками путь к пакету и имя класса виджета, используемый для "
-"отображения виджета ``RichTextField``."
 
-#: defaults.py:262
-msgid ""
-"Dotted path to the function to call on a ``RichTextField`` value before it "
-"is rendered to the template."
+#: defaults.py:305
+msgid "Name of the jQuery file."
 msgstr ""
-"Разделённый точками путь до функции, преобразующей значение "
-"``RichTextField``, при отображении в шаблоне"
 
-#: defaults.py:270
-msgid "Tag Cloud Sizes"
-msgstr "Размеры облака тэгов"
-
-#: defaults.py:271
-msgid "Number of different sizes for tags when shown as a cloud."
+#: defaults.py:306
+msgid "Name of the jQuery file found in mezzanine/core/static/mezzanine/js/"
 msgstr ""
-"Количество разнообразных размеров надписей, отображаемых в облаке тэгов"
 
-#: defaults.py:278
-msgid "Package name of theme app to use."
-msgstr "компонента, используемая в качестве Темы"
+#: defaults.py:314
+msgid "Max paging links"
+msgstr "Максимальное количество ссылок в пагинаторе"
 
-#: defaults.py:285
+#: defaults.py:315
+msgid "Max number of paging links to display when paginating."
+msgstr ""
+"Максимальное количество ссылок на страницы, отображаемых в области пагинации."
+
+#: defaults.py:322
 msgid ""
 "If ``True``, the pages menu will show all levels of navigation, otherwise "
 "child pages are only shown when viewing the parent page."
@@ -252,37 +276,43 @@ msgstr ""
 "Если ``Да``, то административное меню отображает как приложения, так и "
 "модели, в другом случае в меню отображаются только приложения"
 
-#: defaults.py:294
+#: defaults.py:331
 msgid "Min value for a rating."
 msgstr "Минимальное значение для голосования"
 
-#: defaults.py:301
+#: defaults.py:338
 msgid "Max value for a rating."
 msgstr "Максимальное значение для голосования"
 
-#: defaults.py:308
+#: defaults.py:345
+msgid ""
+"Dotted package path and class name of the widget to use for the "
+"``RichTextField``."
+msgstr ""
+"Разделённый точками путь к пакету и имя класса виджета, используемый для "
+"отображения виджета ``RichTextField``."
+
+#: defaults.py:353
+msgid ""
+"Dotted path to the function to call on a ``RichTextField`` value before it "
+"is rendered to the template."
+msgstr ""
+"Разделённый точками путь до функции, преобразующей значение "
+"``RichTextField``, при отображении в шаблоне"
+
+#: defaults.py:361
 msgid "Search results per page"
 msgstr "Количество результатов поиска на страницу"
 
-#: defaults.py:309
+#: defaults.py:362
 msgid "Number of results shown in the search results page."
-msgstr ""
+msgstr "Количество результатов показываемых на странице поиска"
 
-#: defaults.py:316
-msgid "Max search paging links"
-msgstr "Максимальное количество страниц поиска"
-
-#: defaults.py:317
-msgid "Max number of paging links for the search results page."
-msgstr ""
-"Максимальное количество ссылок на страницы, отображаемых на странице "
-"результатов поиска"
-
-#: defaults.py:324
+#: defaults.py:369
 msgid "Site Title"
 msgstr "Заголовок сайта"
 
-#: defaults.py:325
+#: defaults.py:370
 msgid ""
 "Title that will display at the top of the site, and be appended to the "
 "content of the HTML title tags on every page."
@@ -291,27 +321,64 @@ msgstr ""
 "браузера), состоит из заголовка отображаемой страницы с добавлением данной "
 "части"
 
-#: defaults.py:333
+#: defaults.py:378
 msgid "Tagline"
 msgstr "Подзаголовок"
 
-#: defaults.py:334
+#: defaults.py:379
 msgid "A tag line that will appear at the top of all pages."
 msgstr "Подзаголовок, отображаемый на всех страницах сайта"
 
-#: defaults.py:336
+#: defaults.py:381
 msgid "An open source content management platform."
 msgstr ""
 
-#: defaults.py:341
+#: defaults.py:386
+msgid ""
+"Dotted Python path to the callable for converting strings into URL slugs. "
+"Defaults to ``mezzanine.utils.urls.slugify_unicode`` which allows for non-"
+"ascii URLS. Change to ``django.template.defaultfilters.slugify`` to use "
+"Django's slugify function, or something of your own if required."
+msgstr ""
+
+#: defaults.py:397
+msgid "Enable SSL"
+msgstr "Включить SSL"
+
+#: defaults.py:407
+msgid "Force Host"
+msgstr "Проверка хоста"
+
+#: defaults.py:426
 msgid "List of words which will be stripped from search queries."
 msgstr "Список слов, исключаемых из поисковых запросов"
 
-#: defaults.py:398
+#: defaults.py:483
+msgid "Tag Cloud Sizes"
+msgstr "Размеры облака тэгов"
+
+#: defaults.py:484
+msgid "Number of different sizes for tags when shown as a cloud."
+msgstr ""
+"Количество разнообразных размеров надписей, отображаемых в облаке тэгов"
+
+#: defaults.py:491
 msgid "Sequence of setting names available within templates."
 msgstr "Список настроек, переопределяемых пользователем"
 
-#: defaults.py:419
+#: defaults.py:506
+msgid ""
+"Directory name to store thumbnails in, that will be created relative to the "
+"original image's directory."
+msgstr ""
+
+#: defaults.py:514
+msgid ""
+"URL for the JavaScript file (relative to ``STATIC_URL``) that handles "
+"configuring TinyMCE when the default ``RICHTEXT_WIDGET_CLASS`` is used."
+msgstr ""
+
+#: defaults.py:529
 msgid ""
 "If ``True``, the south application will be automatically added to the "
 "``INSTALLED_APPS`` setting."
@@ -331,10 +398,10 @@ msgstr "Настройка"
 msgid "Settings"
 msgstr "Настройки"
 
-#: templates/admin/conf/setting/change_list.html:21
+#: templates/admin/conf/setting/change_list.html:8
 msgid "Please correct the errors below."
 msgstr "Пожалуста, исправьте следующие ошибки"
 
-#: templates/admin/conf/setting/change_list.html:44
+#: templates/admin/conf/setting/change_list.html:31
 msgid "Save"
 msgstr "Сохранить"

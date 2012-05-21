@@ -6,12 +6,16 @@ documentation is generated.
 from __future__ import with_statement
 from datetime import datetime
 import os.path
+from shutil import copyfile, move
 from socket import gethostname
+from warnings import warn
 
 from django.utils.datastructures import SortedDict
+from PIL import Image
 
 from mezzanine import __version__
 from mezzanine.conf import registry
+from mezzanine.utils.importing import import_dotted_path
 
 
 def build_settings_docs(docs_path, prefix=None):
@@ -37,13 +41,19 @@ def build_settings_docs(docs_path, prefix=None):
         if setting_default != dynamic:
             setting_default = repr(setting_default)
         lines.extend(["", settings_name, "-" * len(settings_name)])
-        lines.extend(["", setting["description"]])
+        lines.extend(["", setting["description"].replace("<b>", "``"
+            ).replace("</b>", "``").replace("<a href=\"", "`"
+            ).replace("\" rel=\"nofollow\">", " <").replace("</a>", ">`_")])
+        if setting["choices"]:
+            choices = ", ".join(["%s: ``%s``" % (v, k) for k, v in
+                                 setting["choices"]])
+            lines.extend(["", "Choices: %s" % choices, ""])
         lines.extend(["", "Default: ``%s``" % setting_default])
     with open(os.path.join(docs_path, "settings.rst"), "w") as f:
         f.write("\n".join(lines))
 
 # Python complains if this is inside build_changelog which uses exec.
-_changeset_date = lambda c: datetime.fromtimestamp(c.date()[0])
+_changeset_date = lambda cs: datetime.fromtimestamp(cs.date()[0])
 
 
 def build_changelog(docs_path, package_name="mezzanine"):
@@ -58,6 +68,10 @@ def build_changelog(docs_path, package_name="mezzanine"):
     changelog_file = os.path.join(project_path, changelog_filename)
     versions = SortedDict()
     repo = None
+    hotfixes = {
+        "40cbc47b8d8a": "1.0.9",
+        "a25749986abc": "1.0.10",
+    }
 
     # Load the repo.
     try:
@@ -74,22 +88,26 @@ def build_changelog(docs_path, package_name="mezzanine"):
 
     # Go through each changeset and assign it to the versions dict.
     changesets = [repo.changectx(changeset) for changeset in repo.changelog]
-    for changeset in sorted(changesets, reverse=True, key=_changeset_date):
+    for cs in sorted(changesets, reverse=True, key=_changeset_date):
         # Check if the file with the version number is in this changeset
         # and if it is, pull it out and assign it as a variable.
-        files = changeset.files()
+        files = cs.files()
         new_version = False
         if version_file in files:
-            for line in changeset[version_file].data().split("\n"):
+            for line in cs[version_file].data().split("\n"):
                 if line.startswith(version_var):
                     exec line
-                    date = _changeset_date(changeset)
+                    if locals()[version_var] == "0.1.0":
+                        locals()[version_var] = "1.0.0"
+                        break
                     versions[locals()[version_var]] = {
-                        "changes": [], "date": date.strftime("%b %d, %Y")}
+                        "changes": [],
+                        "date": _changeset_date(cs).strftime("%b %d, %Y")
+                    }
                     new_version = len(files) == 1
         # Ignore changesets that are merges, bumped the version, closed
         # a branch or regenerated the changelog itself.
-        merge = len(changeset.parents()) > 1
+        merge = len(cs.parents()) > 1
         branch_closed = len(files) == 0
         changelog_update = changelog_filename in files
         if merge or new_version or branch_closed or changelog_update:
@@ -101,11 +119,18 @@ def build_changelog(docs_path, package_name="mezzanine"):
         except KeyError:
             continue
         else:
-            description = changeset.description().rstrip(".").replace("\n", "")
-            user = changeset.user().split("<")[0].strip()
+            description = cs.description().rstrip(".").replace("\n", "")
+            user = cs.user().split("<")[0].strip()
             entry = "%s - %s" % (description, user)
             if entry not in versions[version]["changes"]:
-                versions[version]["changes"].insert(0, entry)
+                hotfix = hotfixes.get(cs.hex()[:12])
+                if hotfix:
+                    versions[hotfix] = {
+                        "changes": [entry],
+                        "date": _changeset_date(cs).strftime("%b %d, %Y"),
+                    }
+                else:
+                    versions[version]["changes"].insert(0, entry)
 
     # Write out the changelog.
     with open(changelog_file, "w") as f:
@@ -120,6 +145,51 @@ def build_changelog(docs_path, package_name="mezzanine"):
             else:
                 f.write("  * No changes listed.\n")
             f.write("\n")
+
+
+def build_modelgraph(docs_path, package_name="mezzanine"):
+    """
+    Creates a diagram of all the models for mezzanine and the given
+    package name, generates a smaller version and add it to the
+    docs directory for use in model-graph.rst
+    """
+    to_path = os.path.join(docs_path, "img", "graph.png")
+    build_path = os.path.join(docs_path, "build", "_images")
+    resized_path = os.path.join(os.path.dirname(to_path), "graph-small.png")
+    settings = import_dotted_path(package_name + ".project_template.settings")
+    apps = [a.rsplit(".")[1] for a in settings.INSTALLED_APPS
+            if a.startswith("mezzanine.") or a.startswith(package_name + ".")]
+    try:
+        from django_extensions.management.commands import graph_models
+    except ImportError:
+        warn("Couldn't build model_graph, django_extensions not installed")
+    else:
+        options = {"inheritance": True, "outputfile": "graph.png",
+                  "layout": "dot"}
+        try:
+            graph_models.Command().execute(*apps, **options)
+        except Exception, e:
+            warn("Couldn't build model_graph, graph_models failed on: %s" % e)
+        else:
+            try:
+                move("graph.png", to_path)
+            except OSError, e:
+                warn("Couldn't build model_graph, move failed on: %s" % e)
+    # docs/img/graph.png should exist in the repo - move it to the build path.
+    try:
+        if not os.path.exists(build_path):
+            os.makedirs(build_path)
+        copyfile(to_path, os.path.join(build_path, "graph.png"))
+    except OSError, e:
+        warn("Couldn't build model_graph, copy to build failed on: %s" % e)
+    try:
+        image = Image.open(to_path)
+        image.width = 800
+        image.height = image.size[1] * 800 / image.size[0]
+        image.save(resized_path, "PNG", quality=100)
+    except Exception, e:
+        warn("Couldn't build model_graph, resize failed on: %s" % e)
+        return
 
 
 def build_requirements(docs_path, package_name="mezzanine"):
